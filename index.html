@@ -10,6 +10,13 @@
     <link rel="stylesheet" type="text/css" href="custom.css">
 
     <div id="center" style="display: flex; align-items: center !important; justify-content: center !important; height: calc(95vh);">
+    <div>
+      <div class="d-flex mb-2 align-items-end">
+        <i id="helpTextGuy" class="nes-bcrikko"></i>
+        <div class="nes-balloon from-left" style="max-width: 464px;">
+          <p id="helpText">Try to guess the game from its music</p>
+        </div>
+      </div>
       <div class="nes-container is-rounded bg-grey">
         <div id="content" style="position: relative; height: 374px">
           <div id="player"></div>
@@ -35,6 +42,7 @@
           <button id="nextGameButton"class="nes-btn is-success" onclick="startNewGame()">Next Game</button>
         </div>
       </div>
+    </div>
     </div>  
 
     <script src="confetti.js"></script>
@@ -49,6 +57,8 @@
       const overlay = document.getElementById('overlay');
       const playButton = document.getElementById('playButton');
       const pauseButton = document.getElementById('pauseButton');
+      const helpText = document.getElementById('helpText');
+      const helpTextGuy = document.getElementById('helpTextGuy');
       var gamestate = -1;
       var player = null;
       var music = null;
@@ -115,6 +125,8 @@
             guessButton.disabled = false;
             hintButton.disabled = false;
             nextGameButton.disabled = true;
+            helpText.innerText = "Try to guess the game from its music"
+            helpTextGuy.classList.remove('jump');
             break;
           case gamestateWon:
             console.log("Game won!");
@@ -127,6 +139,7 @@
             guessButton.disabled = true;
             hintButton.disabled = true;
             nextGameButton.disabled = false;
+            helpText.innerText = "Congratulations!"
             break;
           case gamestateLost:
             console.log("Game lost")
@@ -139,6 +152,7 @@
             guessButton.disabled = true;
             hintButton.disabled = true;
             nextGameButton.disabled = false;
+            helpText.innerText = `The game is ${game.Name}`
             break;
           default:
             console.log("Tried to change gamestate to unknown value: ", newState);
@@ -155,6 +169,9 @@
         game = selection.game;
         if(player) {
           player.destroy();
+        }
+        if (selection.game.IsMedley) {
+          helpText.innerText = "This playlist spans multiple games of the same franchise. Please guess the franchise name"
         }
         createPlayerForPlaylist(selection.playlist);
       }
@@ -176,6 +193,10 @@
         console.log(listId);
         const selection = { game: game, playlist: listId};
 
+        if (selection.game.IsMedley) {
+          helpTextGuy.classList.add('jump');
+        }
+ 
         console.log(selection);
         return selection;
       }
@@ -219,28 +240,39 @@
         player.stopVideo();
       }
 
+      function guessMatches(guessValue, correctGuess, correctAliases) {
+        let aliases = [];
+        if (!(correctAliases == null || correctAliases.trim() === '')) {
+          aliases = correctAliases.split(';');
+          aliases = aliases.map(s => s.trimEnd().trim().toLowerCase());
+        }
+        const possibleCorrectAnswers = [ correctGuess.toLowerCase() ].concat(aliases);
+        console.log(possibleCorrectAnswers, `"${guessValue}"`);
+        return possibleCorrectAnswers.includes(guessValue);
+      }
+
       function guess() {
         if (gamestate !== gamestatePlaying) {
           return;
         }
         const guessInput = document.getElementById('guess')
         const guessValue = guessInput.value.toLowerCase();
-        let aliases = [];
-        if (!(game.Alias == null || game.Alias.trim() === '')) {
-          aliases = game.Alias.split(';');
-          aliases = aliases.map(s => s.trimEnd().trim().toLowerCase());
-        }
-        const possibleCorrectAnswers = [ game.Name.toLowerCase() ].concat(aliases);
-        console.log(possibleCorrectAnswers, `"${guessValue}"`);
-        const isCorrect = possibleCorrectAnswers.includes(guessValue);
-        console.log(isCorrect);
 
+        let isCorrect = guessMatches(guessValue, game.Name, game.Alias);
         if (isCorrect) {
           fireConfetti();
           changeGamestate(gamestateWon);
+          guessInput.value = '';
+          return;
+        }
+
+        isCorrect = guessMatches(guessValue, game.Series, game.SeriesAlias);
+        if (isCorrect) {
+          helpText.innerText = "You have guessed the franchise. Which part is it?"
         }
 
         guessInput.value = '';
+        return;
       }
 
       function fireConfetti() {
