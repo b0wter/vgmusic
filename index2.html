@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+  </head>
+  <body>
+    <!--<link rel="stylesheet" href="https://cdn.rawgit.com/Chalarangelo/mini.css/v3.0.1/dist/mini-default.min.css">-->
+    <link href="https://unpkg.com/nes.css@latest/css/nes.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="material-icons.css">
+    <link rel="stylesheet" type="text/css" href="custom.css">
+
+    <div id="center" style="display: flex; align-items: center !important; justify-content: center !important; height: calc(95vh);">
+      <div class="nes-container is-rounded bg-grey">
+        <div id="content" style="position: relative; height: 374px">
+          <div id="player"></div>
+          <div id="overlay" class="slider" style="height: 374px; width: 512px; background: darkred; position: absolute; top: 0; left: 0">
+            <img src="curtain.png" style="width: 100%; height: 100%">
+          </div>
+        </div>
+        <img src="floor.png" style="width: 512px; height: 74px">
+        <div style="display: flex; align-items: center !important; justify-content: center !important;">
+          <div id="controls" class="mt-1 mb-1">
+            <button id="playButton" class="nes-btn is-primary" onClick="player.playVideo()"><span class="material-icons">play_arrow</span></button>
+            <button id="pauseButton" class="nes-btn is-primary" onClick="player.pauseVideo()"><span class="material-icons">pause</span></button>
+            <button id="nextButton" class="nes-btn is-primary" onClick="player.nextVideo()"><span class="material-icons">navigate_next</span></button>
+          </div>
+        </div>
+        <div id="guess-box" style="display: flex;">
+          <input id="guess" class="nes-textarea" type="text" name="guess" style="width: 100%">
+          <button id="guessButton" class="nes-btn ml-2" onclick="guess()"><span class="material-icons">keyboard_return</span></button>
+        </div>
+        <div class="mt-1" style="display: flex;justify-content: center;">
+          <button id="forfeitButton"class="nes-btn is-error" onclick="forfeit()">Give Up</button>
+          <button id="hintButton"class="nes-btn is-warning ml-2 mr-2" onclick="toggleCurtain()">Get Hint</button>
+          <button id="nextGameButton"class="nes-btn is-success" onclick="startNewGame()">Next Game</button>
+        </div>
+      </div>
+    </div>  
+
+    <script src="confetti.js"></script>
+    <script>
+      const gamestatePlaying = 1;
+      const gamestateWon = 2;
+      const gamestateLost = 3;
+      const guessButton = document.getElementById('guessButton');
+      const forfeitButton = document.getElementById('forfeitButton');
+      const hintButton = document.getElementById('hintButton');
+      const nextGameButton = document.getElementById('nextGameButton');
+      const overlay = document.getElementById('overlay');
+      const playButton = document.getElementById('playButton');
+      const pauseButton = document.getElementById('pauseButton');
+      var gamestate = -1;
+      var player = null;
+      var music = null;
+      var game = null;
+      var isIFrameReady = false;
+      var isDataReady = false;
+      var tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      var firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      document.getElementById('guess').onkeypress = function(e) { if (e.keyCode === 13) { guess(); } };
+
+      fetch('/music.json').then(response => response.json()).then(data => data.map(d => { d.wasPlayed = false; return d })).then(data => { console.log(data); music = data; isDataReady = true; if (isIFrameReady) { startNewGame(); } });
+
+      setInterval(setPlaybackButtonColors, 100);
+
+      function guessIfEnter(e) {
+        console.log(e);
+      }
+
+      function setPlaybackButtonColors() {
+        if (player && player.getPlayerState) {
+          const state = player.getPlayerState();
+          switch(state)
+          {
+            case -1:
+            case 2:
+              playButton.classList.remove("is-success");
+              playButton.classList.add("is-primary");
+              pauseButton.classList.remove("is-primary");
+              pauseButton.classList.add("is-success");
+              break;
+            case 1:
+            case 3:
+            case 5:
+              playButton.classList.add("is-success");
+              playButton.classList.remove("is-primary");
+              pauseButton.classList.add("is-primary");
+              pauseButton.classList.remove("is-success");
+              break;
+            case 0:
+              playButton.classList.add("is-success");
+              pauseButton.classList.add("is-primary");
+              break;
+            default:
+              console.log("Youtube returned an unknown player state", state);
+          }
+        }
+      }
+
+      function changeGamestate(newState) {
+        gamestate = newState;
+        switch(gamestate)
+        {
+          case gamestatePlaying:
+            console.log("Starting new game");
+            overlay.classList.remove('closed');
+            forfeitButton.classList.remove('is-disabled');
+            guessButton.classList.remove('is-disabled');
+            hintButton.classList.remove('is-disabled');
+            nextGameButton.classList.add('is-disabled');
+            forfeitButton.disabled = false;
+            guessButton.disabled = false;
+            hintButton.disabled = false;
+            nextGameButton.disabled = true;
+            break;
+          case gamestateWon:
+            console.log("Game won!");
+            overlay.classList.add('closed');
+            forfeitButton.classList.add('is-disabled');
+            guessButton.classList.add('is-disabled');
+            hintButton.classList.add('is-disabled');
+            nextGameButton.classList.remove('is-disabled');
+            forfeitButton.disabled = true;
+            guessButton.disabled = true;
+            hintButton.disabled = true;
+            nextGameButton.disabled = false;
+            break;
+          case gamestateLost:
+            console.log("Game lost")
+            overlay.classList.add('closed');
+            forfeitButton.classList.add('is-disabled');
+            guessButton.classList.add('is-disabled');
+            hintButton.classList.add('is-disabled');
+            nextGameButton.classList.remove('is-disabled');
+            forfeitButton.disabled = true;
+            guessButton.disabled = true;
+            hintButton.disabled = true;
+            nextGameButton.disabled = false;
+            break;
+          default:
+            console.log("Tried to change gamestate to unknown value: ", newState);
+        }
+      }
+
+      function startNewGame() {
+        if (gamestate === gamestatePlaying) {
+          return;
+        }
+        changeGamestate(gamestatePlaying);
+        console.log("starting new game");
+        var selection = selectNewGame();
+        game = selection.game;
+        if(player) {
+          player.destroy();
+        }
+        createPlayerForPlaylist(selection.playlist);
+      }
+
+      function forfeit() {
+        if (gamestate !== gamestatePlaying) {
+          return;
+        }
+        changeGamestate(gamestateLost);
+      }
+
+      function selectNewGame() {
+        const remainingGames = music.filter(m => m.wasPlayed === false);
+        console.log(remainingGames);
+        const index = Math.floor(Math.random() * remainingGames.length);
+        const game = remainingGames[index];
+        game.wasPlayed = true;
+        const listId = game.Link.split('?')[1].split('&').filter(s => s.startsWith('list'))[0].split('=')[1];
+        console.log(listId);
+        const selection = { game: game, playlist: listId};
+
+        console.log(selection);
+        return selection;
+      }
+
+      function toggleCurtain() {
+        document.getElementById('overlay').classList.toggle('closed');
+      }
+
+      function createPlayerForPlaylist(listId) {
+        player = new YT.Player('player', {
+          height: '374',
+          width: '512',
+          playerVars: {
+            listType: 'playlist',
+            list: listId
+          },
+          events: {
+            'onReady': onPlayerReady
+          }
+        });
+      }
+
+      function onYouTubeIframeAPIReady() {
+        console.log('YouTube IFrame is ready');
+        isIFrameReady = true;
+        if (isDataReady) {
+          startNewGame();
+        }
+      }
+
+      function onPlayerReady(event) {
+        event.target.setShuffle(true);
+        event.target.playVideo();
+      }
+
+      function playVideo() {
+        player.startVideo();
+      }
+
+      function stopVideo() {
+        player.stopVideo();
+      }
+
+      function guess() {
+        if (gamestate !== gamestatePlaying) {
+          return;
+        }
+        const guessInput = document.getElementById('guess')
+        const guessValue = guessInput.value.toLowerCase();
+        let aliases = [];
+        if (!(game.Alias == null || game.Alias.trim() === '')) {
+          aliases = game.Alias.split(';');
+          aliases = aliases.map(s => s.trimEnd().trim().toLowerCase());
+        }
+        const possibleCorrectAnswers = [ game.Name.toLowerCase() ].concat(aliases);
+        console.log(possibleCorrectAnswers, `"${guessValue}"`);
+        const isCorrect = possibleCorrectAnswers.includes(guessValue);
+        console.log(isCorrect);
+
+        if (isCorrect) {
+          fireConfetti();
+          changeGamestate(gamestateWon);
+        }
+
+        guessInput.value = '';
+      }
+
+      function fireConfetti() {
+        startConfetti();
+        const canvas = document.getElementById('confetti-canvas');
+        if (canvas) {
+          canvas.style.position = 'absolute';
+          canvas.style.top = 0;
+          canvas.style.left = 0;
+        }
+        setTimeout(stopConfetti, 2000);
+      }
+    </script>
+  </body>
+</html>
+
