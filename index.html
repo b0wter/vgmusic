@@ -63,7 +63,7 @@
 
       document.getElementById('guess').onkeypress = function(e) { if (e.keyCode === 13) { guess(); } };
 
-      fetch('/music.json').then(response => response.json()).then(data => data.map(d => { d.wasPlayed = false; return d })).then(data => { console.log(data); music = data; isDataReady = true; if (isIFrameReady) { startNewGame(); } });
+      fetch('music.json').then(response => response.json()).then(data => data.map(d => { d.wasPlayed = false; return d })).then(data => { console.log(data); music = data; isDataReady = true; if (isIFrameReady) { startNewGame(); } });
 
       setInterval(setPlaybackButtonColors, 100);
 
